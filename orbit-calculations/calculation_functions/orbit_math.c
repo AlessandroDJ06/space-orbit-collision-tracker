@@ -5,8 +5,8 @@ double calculate_orbit_size(double mean_motion) {
     return pow(398600.4418 / pow(mean_motion, 2), 1.0 / 3.0);
 }
 
-double caclulate_new_time(double mean_anomaly, double mean_motion) {
-    return mean_anomaly + (mean_motion * 3600);
+double caclulate_new_time(double mean_anomaly, double mean_motion, double deltaTime) {
+    return mean_anomaly + (mean_motion * deltaTime);
 }
 
 double calculate_eccentric_anomaly(double eccentricity, double previous_eccentric_anomaly, double time) {

@@ -12,6 +12,8 @@ typedef struct {
 } Satellite;
 
 typedef struct {
+    int sat1_id;
+    int sat2_id;
     double miss_distance;
     double relative_velocity;
     double altitude;
@@ -30,7 +32,7 @@ typedef struct {
 } Position;
 
 double calculate_orbit_size(double mean_motion);
-double caclulate_new_time(double mean_anomaly, double mean_motion);
+double caclulate_new_time(double mean_anomaly, double mean_motion,double deltaTime);
 double calculate_eccentric_anomaly(double eccentricity, double previous_eccentric_anomaly, double time);
 double calculate_kepler(double eccentric_anomaly, double eccentricity);
 Position calculate_position(double eccentricity, double eccentric_anomaly, double a);
