@@ -10,6 +10,8 @@ int total_count = 0;
 #define COLLISION_THRESHOLD_KM 50.0
 #define MAX_PAIRS 500
 #define EARTH_RADIUS_KM 6371.0
+#define TCA_WINDOW_SEC 600.0   // ±10 minuten
+#define TCA_STEP_SEC 10.0
 
 Interesting_pair detected_pairs[MAX_PAIRS];
 int detected_pair_count = 0;
@@ -22,6 +24,7 @@ typedef struct {
     double vx;
     double vy;
     double vz;
+    double sma;
 } SortableSatellite;
 
 double* allocate_satellites(int count) {
@@ -58,7 +61,6 @@ int compare_sortable_x(const void* a, const void* b) {
     return 0;
 }
 
-// delta_time_sec MOET in seconden zitten, niet uren/dagen
 void process_orbits(double delta_time_sec) {
     if (satellites == NULL || total_count <= 0) return;
 
@@ -66,38 +68,18 @@ void process_orbits(double delta_time_sec) {
 
     SortableSatellite* sortable_array = (SortableSatellite*) malloc(total_count * sizeof(SortableSatellite));
     if (sortable_array == NULL) return;
-
+    
     for (int i = 0; i < total_count; i++) {
-        Satellite sat = satellites[i];
-
-        double inclination_rad = deg_to_rad(sat.inclination);
-        double raan_rad = deg_to_rad(sat.raan);
-        double arg_perigee_rad = deg_to_rad(sat.arg_perigee);
-        double mean_anomaly_rad = deg_to_rad(sat.mean_anomaly);
-        double mean_motion_rad_s = mean_motion_to_rad_per_sec(sat.mean_motion);
-
-        double a = calculate_orbit_size(mean_motion_rad_s);
-        double M = caclulate_new_time(mean_anomaly_rad, mean_motion_rad_s, delta_time_sec);
-
-        double E = M;
-        for (int iter = 0; iter < 5; iter++) {
-            E = calculate_eccentric_anomaly(sat.eccentricity, E, M);
-        }
-
-        Position pos = calculate_position(sat.eccentricity, E, a);
-        Coordinates coords = calculate_coordinates(pos.x, pos.y, raan_rad, arg_perigee_rad, inclination_rad);
-
-        double r = sqrt(coords.x * coords.x + coords.y * coords.y + coords.z * coords.z);
-        Velocity vel = calculate_velocity(sat.eccentricity, E, a, r);
-        Coordinates vel_coords = calculate_velocity_coordinates(vel.vx, vel.vy, raan_rad, arg_perigee_rad, inclination_rad);
+        PropagatedState state = propagate_satellite(satellites[i], delta_time_sec);
 
         sortable_array[i].sat_index = i;
-        sortable_array[i].x = coords.x;
-        sortable_array[i].y = coords.y;
-        sortable_array[i].z = coords.z;
-        sortable_array[i].vx = vel_coords.x;
-        sortable_array[i].vy = vel_coords.y;
-        sortable_array[i].vz = vel_coords.z;
+        sortable_array[i].x = state.position.x;
+        sortable_array[i].y = state.position.y;
+        sortable_array[i].z = state.position.z;
+        sortable_array[i].vx = state.velocity.x;
+        sortable_array[i].vy = state.velocity.y;
+        sortable_array[i].vz = state.velocity.z;
+        sortable_array[i].sma = state.sma;
     }
 
     qsort(sortable_array, total_count, sizeof(SortableSatellite), compare_sortable_x);
@@ -122,21 +104,42 @@ void process_orbits(double delta_time_sec) {
             Satellite sat1 = satellites[idx1];
             Satellite sat2 = satellites[idx2];
 
-            double dvx = sortable_array[j].vx - sortable_array[i].vx;
-            double dvy = sortable_array[j].vy - sortable_array[i].vy;
-            double dvz = sortable_array[j].vz - sortable_array[i].vz;
-            double relative_velocity = sqrt(dvx*dvx + dvy*dvy + dvz*dvz);
+            double tca_t = find_tca(sat1, sat2, delta_time_sec, TCA_WINDOW_SEC, TCA_STEP_SEC);
 
-            double r1 = sqrt(sortable_array[i].x * sortable_array[i].x +
-                             sortable_array[i].y * sortable_array[i].y +
-                             sortable_array[i].z * sortable_array[i].z);
+            PropagatedState s1_tca = propagate_satellite(sat1, tca_t);
+            PropagatedState s2_tca = propagate_satellite(sat2, tca_t);
+
+            double tdx = s2_tca.position.x - s1_tca.position.x;
+            double tdy = s2_tca.position.y - s1_tca.position.y;
+            double tdz = s2_tca.position.z - s1_tca.position.z;
+            double tca_distance = sqrt(tdx*tdx + tdy*tdy + tdz*tdz);
+
+            double tdvx = s2_tca.velocity.x - s1_tca.velocity.x;
+            double tdvy = s2_tca.velocity.y - s1_tca.velocity.y;
+            double tdvz = s2_tca.velocity.z - s1_tca.velocity.z;
+            double relative_velocity = sqrt(tdvx*tdvx + tdvy*tdvy + tdvz*tdvz);
+            double radial_velocity = (tdx*tdvx + tdy*tdvy + tdz*tdvz) / tca_distance;
+
+            double r1 = sqrt(s1_tca.position.x * s1_tca.position.x +
+                             s1_tca.position.y * s1_tca.position.y +
+                             s1_tca.position.z * s1_tca.position.z);
+            double r2 = sqrt(s2_tca.position.x * s2_tca.position.x +
+                             s2_tca.position.y * s2_tca.position.y +
+                             s2_tca.position.z * s2_tca.position.z);
 
             detected_pairs[detected_pair_count].sat1_id = sat1.id;
             detected_pairs[detected_pair_count].sat2_id = sat2.id;
-            detected_pairs[detected_pair_count].miss_distance = distance;
-            detected_pairs[detected_pair_count].altitude = r1 - EARTH_RADIUS_KM;
-            detected_pairs[detected_pair_count].relative_incline = fabs(sat1.inclination - sat2.inclination);
+            detected_pairs[detected_pair_count].miss_distance = tca_distance;
             detected_pairs[detected_pair_count].relative_velocity = relative_velocity;
+            detected_pairs[detected_pair_count].radial_velocity = radial_velocity;
+            detected_pairs[detected_pair_count].altitude_sat1 = r1 - EARTH_RADIUS_KM;
+            detected_pairs[detected_pair_count].altitude_sat2 = r2 - EARTH_RADIUS_KM;
+            detected_pairs[detected_pair_count].relative_incline = fabs(sat1.inclination - sat2.inclination);
+            detected_pairs[detected_pair_count].sat1_sma = s1_tca.sma;
+            detected_pairs[detected_pair_count].sat2_sma = s2_tca.sma;
+            detected_pairs[detected_pair_count].sat1_ecc = sat1.eccentricity;
+            detected_pairs[detected_pair_count].sat2_ecc = sat2.eccentricity;
+            detected_pairs[detected_pair_count].time_to_tca = tca_t;
 
             detected_pair_count++;
         }

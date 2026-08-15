@@ -68,3 +68,56 @@ Velocity calculate_velocity(double eccentricity, double eccentric_anomaly, doubl
 Coordinates calculate_velocity_coordinates(double vx_prime, double vy_prime, double raan, double arg_perigee, double inclination) {
     return calculate_coordinates(vx_prime, vy_prime, raan, arg_perigee, inclination);
 }
+
+PropagatedState propagate_satellite(Satellite sat, double t_sec) {
+    double inclination_rad = deg_to_rad(sat.inclination);
+    double raan_rad = deg_to_rad(sat.raan);
+    double arg_perigee_rad = deg_to_rad(sat.arg_perigee);
+    double mean_anomaly_rad = deg_to_rad(sat.mean_anomaly);
+    double mean_motion_rad_s = mean_motion_to_rad_per_sec(sat.mean_motion);
+
+    double a = calculate_orbit_size(mean_motion_rad_s);
+    double M = caclulate_new_time(mean_anomaly_rad, mean_motion_rad_s, t_sec);
+
+    double E = M;
+    for (int iter = 0; iter < 5; iter++) {
+        E = calculate_eccentric_anomaly(sat.eccentricity, E, M);
+    }
+
+    Position pos = calculate_position(sat.eccentricity, E, a);
+    Coordinates coords = calculate_coordinates(pos.x, pos.y, raan_rad, arg_perigee_rad, inclination_rad);
+
+    double r = sqrt(coords.x * coords.x + coords.y * coords.y + coords.z * coords.z);
+    Velocity vel = calculate_velocity(sat.eccentricity, E, a, r);
+    Coordinates vel_coords = calculate_velocity_coordinates(vel.vx, vel.vy, raan_rad, arg_perigee_rad, inclination_rad);
+
+    PropagatedState state;
+    state.position = coords;
+    state.velocity = vel_coords;
+    state.sma = a;
+    return state;
+}
+
+static double distance_between(Satellite sat1, Satellite sat2, double t_sec) {
+    PropagatedState s1 = propagate_satellite(sat1, t_sec);
+    PropagatedState s2 = propagate_satellite(sat2, t_sec);
+
+    double dx = s2.position.x - s1.position.x;
+    double dy = s2.position.y - s1.position.y;
+    double dz = s2.position.z - s1.position.z;
+    return sqrt(dx*dx + dy*dy + dz*dz);
+}
+
+double find_tca(Satellite sat1, Satellite sat2, double t_center, double window_sec, double step_sec) {
+    double best_t = t_center;
+    double best_distance = distance_between(sat1, sat2, t_center);
+
+    for (double t = t_center - window_sec; t <= t_center + window_sec; t += step_sec) {
+        double d = distance_between(sat1, sat2, t);
+        if (d < best_distance) {
+            best_distance = d;
+            best_t = t;
+        }
+    }
+    return best_t;
+}
