@@ -19,6 +19,9 @@ typedef struct {
     double x;
     double y;
     double z;
+    double vx;
+    double vy;
+    double vz;
 } SortableSatellite;
 
 double* allocate_satellites(int count) {
@@ -55,7 +58,8 @@ int compare_sortable_x(const void* a, const void* b) {
     return 0;
 }
 
-void process_orbits(double delta_time) {
+// delta_time_sec MOET in seconden zitten, niet uren/dagen
+void process_orbits(double delta_time_sec) {
     if (satellites == NULL || total_count <= 0) return;
 
     detected_pair_count = 0;
@@ -66,8 +70,14 @@ void process_orbits(double delta_time) {
     for (int i = 0; i < total_count; i++) {
         Satellite sat = satellites[i];
 
-        double a = calculate_orbit_size(sat.mean_motion);
-        double M = caclulate_new_time(sat.mean_anomaly, sat.mean_motion,delta_time);
+        double inclination_rad = deg_to_rad(sat.inclination);
+        double raan_rad = deg_to_rad(sat.raan);
+        double arg_perigee_rad = deg_to_rad(sat.arg_perigee);
+        double mean_anomaly_rad = deg_to_rad(sat.mean_anomaly);
+        double mean_motion_rad_s = mean_motion_to_rad_per_sec(sat.mean_motion);
+
+        double a = calculate_orbit_size(mean_motion_rad_s);
+        double M = caclulate_new_time(mean_anomaly_rad, mean_motion_rad_s, delta_time_sec);
 
         double E = M;
         for (int iter = 0; iter < 5; iter++) {
@@ -75,12 +85,19 @@ void process_orbits(double delta_time) {
         }
 
         Position pos = calculate_position(sat.eccentricity, E, a);
-        Coordinates coords = calculate_coordinates(pos.x, pos.y, sat.raan, sat.arg_perigee, sat.inclination);
+        Coordinates coords = calculate_coordinates(pos.x, pos.y, raan_rad, arg_perigee_rad, inclination_rad);
+
+        double r = sqrt(coords.x * coords.x + coords.y * coords.y + coords.z * coords.z);
+        Velocity vel = calculate_velocity(sat.eccentricity, E, a, r);
+        Coordinates vel_coords = calculate_velocity_coordinates(vel.vx, vel.vy, raan_rad, arg_perigee_rad, inclination_rad);
 
         sortable_array[i].sat_index = i;
         sortable_array[i].x = coords.x;
         sortable_array[i].y = coords.y;
         sortable_array[i].z = coords.z;
+        sortable_array[i].vx = vel_coords.x;
+        sortable_array[i].vy = vel_coords.y;
+        sortable_array[i].vz = vel_coords.z;
     }
 
     qsort(sortable_array, total_count, sizeof(SortableSatellite), compare_sortable_x);
@@ -90,33 +107,38 @@ void process_orbits(double delta_time) {
             if ((sortable_array[j].x - sortable_array[i].x) > COLLISION_THRESHOLD_KM) {
                 break;
             }
+
             double dx = sortable_array[j].x - sortable_array[i].x;
             double dy = sortable_array[j].y - sortable_array[i].y;
             double dz = sortable_array[j].z - sortable_array[i].z;
             double distance = sqrt(dx*dx + dy*dy + dz*dz);
 
-            if (distance < COLLISION_THRESHOLD_KM) {
-                if (detected_pair_count < MAX_PAIRS) {
-                    int idx1 = sortable_array[i].sat_index;
-                    int idx2 = sortable_array[j].sat_index;
+            if (distance >= COLLISION_THRESHOLD_KM) continue;
+            if (detected_pair_count >= MAX_PAIRS) continue;
 
-                    Satellite sat1 = satellites[idx1];
-                    Satellite sat2 = satellites[idx2];
+            int idx1 = sortable_array[i].sat_index;
+            int idx2 = sortable_array[j].sat_index;
 
-                    detected_pairs[detected_pair_count].sat1_id = sat1.id;
-                    detected_pairs[detected_pair_count].sat2_id = sat2.id;
-                    detected_pairs[detected_pair_count].miss_distance = distance;
-                    double r1 = sqrt(sortable_array[i].x * sortable_array[i].x +
-                                     sortable_array[i].y * sortable_array[i].y +
-                                     sortable_array[i].z * sortable_array[i].z);
-                    detected_pairs[detected_pair_count].altitude = r1 - EARTH_RADIUS_KM;
-                    double inc_diff = fabs(sat1.inclination - sat2.inclination);
-                    detected_pairs[detected_pair_count].relative_incline = inc_diff;
-                    detected_pairs[detected_pair_count].relative_velocity = fabs(sat1.mean_motion - sat2.mean_motion);
+            Satellite sat1 = satellites[idx1];
+            Satellite sat2 = satellites[idx2];
 
-                    detected_pair_count++;
-                }
-            }
+            double dvx = sortable_array[j].vx - sortable_array[i].vx;
+            double dvy = sortable_array[j].vy - sortable_array[i].vy;
+            double dvz = sortable_array[j].vz - sortable_array[i].vz;
+            double relative_velocity = sqrt(dvx*dvx + dvy*dvy + dvz*dvz);
+
+            double r1 = sqrt(sortable_array[i].x * sortable_array[i].x +
+                             sortable_array[i].y * sortable_array[i].y +
+                             sortable_array[i].z * sortable_array[i].z);
+
+            detected_pairs[detected_pair_count].sat1_id = sat1.id;
+            detected_pairs[detected_pair_count].sat2_id = sat2.id;
+            detected_pairs[detected_pair_count].miss_distance = distance;
+            detected_pairs[detected_pair_count].altitude = r1 - EARTH_RADIUS_KM;
+            detected_pairs[detected_pair_count].relative_incline = fabs(sat1.inclination - sat2.inclination);
+            detected_pairs[detected_pair_count].relative_velocity = relative_velocity;
+
+            detected_pair_count++;
         }
     }
 
