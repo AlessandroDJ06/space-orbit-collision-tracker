@@ -3,7 +3,9 @@ import cesium from 'vite-plugin-cesium';
 
 export default defineConfig({
     base: '/space-orbit-collision-tracker/',
-    plugins: [cesium()],
+    plugins: [
+        cesium()
+    ],
     build: {
         target: 'esnext',
         cssMinify: false,
