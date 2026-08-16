@@ -6,7 +6,7 @@ export default defineConfig({
     plugins: [cesium()],
     build: {
         target: 'esnext',
-        cssMinify: 'esbuild',
+        cssMinify: true,
         rollupOptions: {
             external: [
                 /satellite\.js\/wasm-build\/.*/
