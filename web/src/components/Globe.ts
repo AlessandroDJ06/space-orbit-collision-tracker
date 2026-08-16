@@ -19,7 +19,10 @@ export class OrbitGlobe {
     }
 
     private async initializeViewer(containerId: string) {
-        const terrain = await Cesium.createWorldTerrainAsync();
+        // Geen Cesium Ion token beschikbaar -> geen createWorldTerrainAsync()
+        // (dat vraagt Ion asset 1 op en geeft een 401 zonder geldig token).
+        // EllipsoidTerrainProvider = vlakke, token-vrije terrain.
+        const terrain = new Cesium.EllipsoidTerrainProvider();
 
         this.viewer = new Cesium.Viewer(containerId, {
             animation: false,
@@ -28,10 +31,12 @@ export class OrbitGlobe {
             geocoder: false,
             infoBox: false,
             selectionIndicator: false,
-            terrainProvider: terrain
+            terrainProvider: terrain,
+            baseLayer: Cesium.ImageryLayer.fromProviderAsync(
+                Cesium.OpenStreetMapImageryProvider.fromUrl('https://tile.openstreetmap.org/')
+            )
         });
 
-        // Optimaliseer resolutie voor mobiele schermen (PixelRatio)
         this.viewer.resolutionScale = window.devicePixelRatio > 1 ? window.devicePixelRatio : 1;
 
         const logo = document.querySelector('.cesium-viewer-bottom') as HTMLElement;
@@ -49,13 +54,11 @@ export class OrbitGlobe {
         this.tooltipElement.style.zIndex = '1000';
         this.tooltipElement.style.backgroundColor = 'rgba(0, 0, 0, 0.9)';
         this.tooltipElement.style.color = 'white';
-
-        // Mobiel-vriendelijke styling (responsief & flexibel)
         this.tooltipElement.style.padding = '14px 18px';
         this.tooltipElement.style.borderRadius = '8px';
         this.tooltipElement.style.fontSize = '14px';
         this.tooltipElement.style.minWidth = '240px';
-        this.tooltipElement.style.maxWidth = '90vw'; // Voorkom dat hij breder wordt dan het scherm op mobiel
+        this.tooltipElement.style.maxWidth = '90vw';
         this.tooltipElement.style.boxShadow = '0 4px 12px rgba(0,0,0,0.5)';
         this.tooltipElement.style.border = '1px solid #777';
 
@@ -95,18 +98,15 @@ export class OrbitGlobe {
 
                 this.tooltipElement.style.display = 'block';
 
-                // Slimme positie bepaling: voorkom dat de box buiten het scherm valt op mobiel
                 const screenWidth = window.innerWidth;
                 const screenHeight = window.innerHeight;
 
                 let left = movement.position.x + 15;
                 let top = movement.position.y + 15;
 
-                // Als de box te ver naar rechts valt, zet hem links van de muis/touch
                 if (left + 260 > screenWidth) {
                     left = screenWidth - 270;
                 }
-                // Als de box te ver naar onder valt, zet hem erboven
                 if (top + 120 > screenHeight) {
                     top = movement.position.y - 130;
                 }
@@ -137,9 +137,8 @@ export class OrbitGlobe {
         const nowJulian = Cesium.JulianDate.fromDate(now);
         let maxPeriodSeconds = 0;
 
-        // Detecteer of het om een mobiel apparaat gaat om de puntgrootte aan te passen
         const isMobile = window.innerWidth < 768;
-        const pointPixelSize = isMobile ? 22 : 16; // Grotere bolletjes op mobiel voor betere touch-doelen
+        const pointPixelSize = isMobile ? 22 : 16;
 
         for (let index = 0; index < tles.length; index++) {
             const tle = tles[index];

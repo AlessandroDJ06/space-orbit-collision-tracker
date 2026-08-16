@@ -4,11 +4,14 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Space Orbit Collision Tracker</title>
-    <link rel="stylesheet" href="https://cesium.com/downloads/cesiumjs/releases/1.115/Build/Cesium/Widgets/widgets.css">
-    <script src="https://cesium.com/downloads/cesiumjs/releases/1.115/Build/Cesium/Cesium.js"></script>
 </head>
 <body>
-<div id="app"></div>
+<div id="app">
+    <div id="cesiumContainer" style="width: 100vw; height: 100vh;"></div>
+</div>
+<script>
+    window.CESIUM_BASE_URL = '%BASE_URL%cesium/';
+</script>
 <script type="module" src="/src/main.ts"></script>
 </body>
 </html>
