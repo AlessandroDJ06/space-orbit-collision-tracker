@@ -7,7 +7,7 @@ import { initOrbitEngine, loadSatellites } from './wasm/orbitEngine';
 import type { DetectedPair } from './wasm/orbitEngine';
 import { OnnxPredictor } from './services/modelRunner.ts';
 
-const SATELLITE_GROUP = 'starlink';
+const SATELLITE_GROUP = 'active';
 const analysedPairs = new Map<number, string>();
 const predictor = new OnnxPredictor();
 
