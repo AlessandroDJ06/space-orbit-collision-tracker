@@ -19,9 +19,6 @@ export class OrbitGlobe {
     }
 
     private async initializeViewer(containerId: string) {
-        // Geen Cesium Ion token beschikbaar -> geen createWorldTerrainAsync()
-        // (dat vraagt Ion asset 1 op en geeft een 401 zonder geldig token).
-        // EllipsoidTerrainProvider = vlakke, token-vrije terrain.
         const terrain = new Cesium.EllipsoidTerrainProvider();
 
         this.viewer = new Cesium.Viewer(containerId, {
@@ -32,8 +29,10 @@ export class OrbitGlobe {
             infoBox: false,
             selectionIndicator: false,
             terrainProvider: terrain,
-            baseLayer: Cesium.ImageryLayer.fromProviderAsync(
-                Cesium.OpenStreetMapImageryProvider.fromUrl('https://tile.openstreetmap.org/')
+            baseLayer: new Cesium.ImageryLayer(
+                new Cesium.OpenStreetMapImageryProvider({
+                    url: 'https://tile.openstreetmap.org/'
+                })
             )
         });
 
@@ -97,7 +96,6 @@ export class OrbitGlobe {
                 `;
 
                 this.tooltipElement.style.display = 'block';
-
                 const screenWidth = window.innerWidth;
                 const screenHeight = window.innerHeight;
 
@@ -203,7 +201,7 @@ export class OrbitGlobe {
                 name: tle.name,
                 position: positionProperty,
                 point: {
-                    pixelSize: pointPixelSize, // Dynamisch aangepast voor mobiel/desktop
+                    pixelSize: pointPixelSize,
                     color: Cesium.Color.YELLOW,
                     outlineColor: Cesium.Color.BLACK,
                     outlineWidth: 2
