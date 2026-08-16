@@ -1,0 +1,41 @@
+name: Update TLE Data
+
+on:
+  schedule:
+    - cron: '0 */2 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update-tle:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          ref: main
+
+      - name: Fetch TLE format
+        run: |
+          curl -sf "https://celestrak.org/NORAD/elements/gp.php?GROUP=active&FORMAT=tle" \
+            -o web/public/data/celestrak-active.tle
+
+      - name: Fetch JSON format
+        run: |
+          curl -sf "https://celestrak.org/NORAD/elements/gp.php?GROUP=active&FORMAT=json" \
+            -o web/public/data/celestrak-active.json
+
+      - name: Validate downloads are non-empty
+        run: |
+          test -s web/public/data/celestrak-active.tle
+          test -s web/public/data/celestrak-active.json
+
+      - name: Commit and push if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add web/public/data/celestrak-active.tle web/public/data/celestrak-active.json
+          git diff --staged --quiet || git commit -m "chore: update TLE data [skip ci]"
+          git push

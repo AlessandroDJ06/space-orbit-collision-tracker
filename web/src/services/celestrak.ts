@@ -12,17 +12,6 @@ export interface CelestrakTLE {
     MEAN_MOTION: number;
 }
 
-export async function fetchCelestrakGroup(group: string): Promise<CelestrakTLE[]> {
-    const url = `https://celestrak.org/NORAD/elements/gp.php?GROUP=${group}&FORMAT=json`;
-    const response = await fetch(url);
-
-    if (!response.ok) {
-        throw new Error(`CelesTrak fetch failed: ${response.status} ${response.statusText}`);
-    }
-
-    return response.json();
-}
-
 const CACHE_PREFIX = 'celestrak-cache-';
 const CACHE_TTL_MS = 2 * 60 * 60 * 1000;
 
@@ -48,12 +37,17 @@ export async function fetchCelestrakGroupCached(group: string): Promise<Celestra
         }
     }
 
+    const staticUrl = `${import.meta.env.BASE_URL}data/celestrak-${group}.json`;
+
     try {
-        const data = await fetchCelestrakGroup(group);
+        const response = await fetch(staticUrl);
+        if (!response.ok) {
+            throw new Error(`Statisch JSON-bestand niet gevonden: ${response.status}`);
+        }
+        const data: CelestrakTLE[] = await response.json();
         safeCacheWrite(cacheKey, data);
         return data;
     } catch (e) {
-        console.warn(`Live CelesTrak fetch mislukt voor groep '${group}', gebruik lokale fallback-dataset.`, e);
         return getFallbackCelestrakData();
     }
 }
