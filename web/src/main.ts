@@ -1,7 +1,7 @@
 import './style.css';
 import { OrbitGlobe } from './components/Globe';
-import { fetchCelestrakGroupCached } from './services/celestrak';
 import { fetchCelestrakTLEs } from './services/celestrakTle';
+import { tleEntryToCelestrakTLE } from './services/celestrakFallback';
 import { celestrakToSatelliteInput } from './services/celestrakMapper';
 import { initOrbitEngine, loadSatellites } from './wasm/orbitEngine';
 import type { DetectedPair } from './wasm/orbitEngine';
@@ -14,14 +14,17 @@ const analysedPairs = new Map<number, string>();
 const predictor = new OnnxPredictor();
 
 async function loadRealSatellites(globe: OrbitGlobe) {
-    const tles = (await fetchCelestrakGroupCached(SATELLITE_GROUP)).slice(0, MAX_SATELLITES);
-    const satelliteInputs = tles.map(celestrakToSatelliteInput);
+    const tleEntries = (await fetchCelestrakTLEs(SATELLITE_GROUP)).slice(0, MAX_SATELLITES);
+
+    const satelliteInputs = tleEntries
+        .map(tleEntryToCelestrakTLE)
+        .filter((tle): tle is NonNullable<typeof tle> => tle !== null)
+        .map(celestrakToSatelliteInput);
 
     await initOrbitEngine();
     loadSatellites(satelliteInputs);
     await predictor.loadModel('./model/collision_risk_classifier.onnx');
 
-    const tleEntries = (await fetchCelestrakTLEs(SATELLITE_GROUP)).slice(0, MAX_SATELLITES);
     globe.addSatellitesFromTLE(tleEntries);
 }
 

@@ -43,7 +43,7 @@ function parseEpochToISOString(line1: string): string {
     return new Date(startOfYear + msIntoYear).toISOString();
 }
 
-function tleEntryToCelestrakTLE(entry: TleEntry): CelestrakTLE | null {
+export function tleEntryToCelestrakTLE(entry: TleEntry): CelestrakTLE | null {
     const { line1, line2 } = entry;
     if (line1.length < 63 || line2.length < 63) return null;
 

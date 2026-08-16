@@ -77,14 +77,14 @@ export class OrbitGlobe {
 
             if (Cesium.defined(pickedObject) && pickedObject.id instanceof Cesium.Entity) {
                 const entity = pickedObject.id;
-                const satName = entity.name || 'Onbekend';
+                const satName = entity.name || 'Unknown';
 
                 // @ts-ignore
                 const satId = entity.satId;
 
                 const riskStatus = (satId !== undefined && this.activeRisks.has(satId))
                     ? this.activeRisks.get(satId)!
-                    : 'Nog niet geanalyseerd';
+                    : 'Not analysed yet';
 
                 const riskColorCss = this.getRiskColor(satId).toCssColorString();
 
