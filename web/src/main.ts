@@ -8,18 +8,20 @@ import type { DetectedPair } from './wasm/orbitEngine';
 import { OnnxPredictor } from './services/modelRunner.ts';
 
 const SATELLITE_GROUP = 'active';
+const MAX_SATELLITES = 500;
+
 const analysedPairs = new Map<number, string>();
 const predictor = new OnnxPredictor();
 
 async function loadRealSatellites(globe: OrbitGlobe) {
-    const tles = await fetchCelestrakGroupCached(SATELLITE_GROUP);
+    const tles = (await fetchCelestrakGroupCached(SATELLITE_GROUP)).slice(0, MAX_SATELLITES);
     const satelliteInputs = tles.map(celestrakToSatelliteInput);
 
     await initOrbitEngine();
     loadSatellites(satelliteInputs);
     await predictor.loadModel('./model/collision_risk_classifier.onnx');
 
-    const tleEntries = await fetchCelestrakTLEs(SATELLITE_GROUP);
+    const tleEntries = (await fetchCelestrakTLEs(SATELLITE_GROUP)).slice(0, MAX_SATELLITES);
     globe.addSatellitesFromTLE(tleEntries);
 }
 

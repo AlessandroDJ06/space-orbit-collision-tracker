@@ -83,8 +83,10 @@ export class OrbitGlobe {
                 const satId = entity.satId;
 
                 const riskStatus = (satId !== undefined && this.activeRisks.has(satId))
-                    ? this.activeRisks.get(satId)
-                    : 'Safe / Low Risk';
+                    ? this.activeRisks.get(satId)!
+                    : 'Nog niet geanalyseerd';
+
+                const riskColorCss = this.getRiskColor(satId).toCssColorString();
 
                 this.tooltipElement.innerHTML = `
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
@@ -92,7 +94,7 @@ export class OrbitGlobe {
                         <span id="closeTooltip" style="cursor: pointer; font-size: 18px; font-weight: bold; padding: 0 6px;">&times;</span>
                     </div>
                     ID: ${satId ?? 'N/A'}<br/>
-                    Status: <span style="color: ${riskStatus?.includes('Safe') ? '#0ff' : '#ff4444'}; font-weight: bold;">${riskStatus}</span>
+                    Status: <span style="color: ${riskColorCss}; font-weight: bold;">${riskStatus}</span>
                 `;
 
                 this.tooltipElement.style.display = 'block';
@@ -128,6 +130,24 @@ export class OrbitGlobe {
         return this.readyPromise;
     }
 
+    private getRiskColor(satId: number | undefined): Cesium.Color {
+        if (satId === undefined) return Cesium.Color.CYAN;
+
+        const status = this.activeRisks.get(satId);
+        switch (status) {
+            case 'Critical':
+                return Cesium.Color.RED;
+            case 'High Risk':
+                return Cesium.Color.ORANGE;
+            case 'Medium Risk':
+                return Cesium.Color.YELLOW;
+            case 'Low Risk':
+                return Cesium.Color.LIME;
+            default:
+                return Cesium.Color.CYAN;
+        }
+    }
+
     addSatellitesFromTLE(tles: TleEntry[], sampleCount = 90) {
         if (!this.viewer) return;
 
@@ -136,7 +156,7 @@ export class OrbitGlobe {
         let maxPeriodSeconds = 0;
 
         const isMobile = window.innerWidth < 768;
-        const pointPixelSize = isMobile ? 22 : 16;
+        const pointPixelSize = isMobile ? 16 : 10;
 
         for (let index = 0; index < tles.length; index++) {
             const tle = tles[index];
@@ -202,7 +222,7 @@ export class OrbitGlobe {
                 position: positionProperty,
                 point: {
                     pixelSize: pointPixelSize,
-                    color: Cesium.Color.YELLOW,
+                    color: new Cesium.CallbackProperty(() => this.getRiskColor(customSatId), false),
                     outlineColor: Cesium.Color.BLACK,
                     outlineWidth: 2
                 },
