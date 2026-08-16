@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 from sklearn.metrics import classification_report, confusion_matrix
-from sklearn.utils.class_weight import compute_sample_weight
+from imblearn.over_sampling import SMOTE
 from xgboost import XGBClassifier
 import onnxruntime as ort
 import onnxmltools
@@ -45,29 +45,31 @@ X_train = df_train[feature_cols]
 X_val = df_val[feature_cols]
 
 def risk_to_tier(risk):
-    if risk > -6:
-        return 3
-    elif risk > -10:
+    if risk > -5:
         return 2
-    elif risk > -20:
+    elif risk > -7:
         return 1
     else:
         return 0
 
 Y_train_tier = df_train["risk"].apply(risk_to_tier)
 Y_val_tier = df_val["risk"].apply(risk_to_tier)
-sample_weights = compute_sample_weight(class_weight="balanced", y=Y_train_tier)
+
 X_train_arr = X_train.to_numpy()
 X_val_arr = X_val.to_numpy()
+min_class_count = Y_train_tier.value_counts().min()
+k_neighbors = max(1, min(5, min_class_count - 1))
+smote = SMOTE(random_state=42, k_neighbors=k_neighbors)
+X_train_arr, Y_train_tier = smote.fit_resample(X_train_arr, Y_train_tier)
 
 clf = XGBClassifier(
     n_estimators=200, max_depth=4, learning_rate=0.05,
-    objective="multi:softprob", num_class=4
+    objective="multi:softprob", num_class=3
 )
-clf.fit(X_train_arr, Y_train_tier, sample_weight=sample_weights)
+clf.fit(X_train_arr, Y_train_tier)
 
 preds_tier = clf.predict(X_val_arr)
-print(classification_report(Y_val_tier, preds_tier, target_names=["low", "medium", "risk", "critical"]))
+print(classification_report(Y_val_tier, preds_tier, target_names=["low", "medium", "risky"]))
 print(confusion_matrix(Y_val_tier, preds_tier))
 
 probs = clf.predict_proba(X_val_arr)
