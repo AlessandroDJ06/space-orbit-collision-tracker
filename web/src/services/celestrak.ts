@@ -19,7 +19,7 @@ function safeCacheWrite(cacheKey: string, data: CelestrakTLE[]) {
     try {
         sessionStorage.setItem(cacheKey, JSON.stringify({ timestamp: Date.now(), data }));
     } catch (e) {
-        console.warn(`could not write cache '${cacheKey}':`, e);
+        console.warn(`Kon cache niet wegschrijven voor '${cacheKey}':`, e);
     }
 }
 
@@ -42,7 +42,7 @@ export async function fetchCelestrakGroupCached(group: string): Promise<Celestra
     try {
         const response = await fetch(staticUrl);
         if (!response.ok) {
-            throw new Error(`Statisch JSON-bestand niet gevonden: ${response.status}`);
+            throw new Error(`JSON-file not found: ${response.status} (${staticUrl})`);
         }
         const data: CelestrakTLE[] = await response.json();
         safeCacheWrite(cacheKey, data);
