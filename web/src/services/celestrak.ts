@@ -1,3 +1,5 @@
+import { getFallbackCelestrakData } from './celestrakFallback';
+
 export interface CelestrakTLE {
     OBJECT_NAME: string;
     NORAD_CAT_ID: number;
@@ -9,6 +11,7 @@ export interface CelestrakTLE {
     MEAN_ANOMALY: number;
     MEAN_MOTION: number;
 }
+
 export async function fetchCelestrakGroup(group: string): Promise<CelestrakTLE[]> {
     const url = `https://celestrak.org/NORAD/elements/gp.php?GROUP=${group}&FORMAT=json`;
     const response = await fetch(url);
@@ -22,6 +25,14 @@ export async function fetchCelestrakGroup(group: string): Promise<CelestrakTLE[]
 
 const CACHE_PREFIX = 'celestrak-cache-';
 const CACHE_TTL_MS = 2 * 60 * 60 * 1000;
+
+function safeCacheWrite(cacheKey: string, data: CelestrakTLE[]) {
+    try {
+        sessionStorage.setItem(cacheKey, JSON.stringify({ timestamp: Date.now(), data }));
+    } catch (e) {
+        console.warn(`could not write cache '${cacheKey}':`, e);
+    }
+}
 
 export async function fetchCelestrakGroupCached(group: string): Promise<CelestrakTLE[]> {
     const cacheKey = CACHE_PREFIX + group;
@@ -37,7 +48,12 @@ export async function fetchCelestrakGroupCached(group: string): Promise<Celestra
         }
     }
 
-    const data = await fetchCelestrakGroup(group);
-    sessionStorage.setItem(cacheKey, JSON.stringify({ timestamp: Date.now(), data }));
-    return data;
+    try {
+        const data = await fetchCelestrakGroup(group);
+        safeCacheWrite(cacheKey, data);
+        return data;
+    } catch (e) {
+        console.warn(`Live CelesTrak fetch mislukt voor groep '${group}', gebruik lokale fallback-dataset.`, e);
+        return getFallbackCelestrakData();
+    }
 }
