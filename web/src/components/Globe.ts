@@ -129,7 +129,11 @@ export class OrbitGlobe {
     async whenReady() {
         return this.readyPromise;
     }
-
+    private parseNoradId(line1: string): number | null {
+        const raw = line1.substring(2, 7).trim();
+        const id = parseInt(raw, 10);
+        return Number.isNaN(id) ? null : id;
+    }
     private getRiskColor(satId: number | undefined): Cesium.Color {
         if (satId === undefined) return Cesium.Color.CYAN;
 
@@ -156,7 +160,7 @@ export class OrbitGlobe {
         let maxPeriodSeconds = 0;
 
         const isMobile = window.innerWidth < 768;
-        const pointPixelSize = isMobile ? 16 : 10;
+        const pointPixelSize = isMobile ? 22 : 16;
 
         for (let index = 0; index < tles.length; index++) {
             const tle = tles[index];
@@ -215,7 +219,7 @@ export class OrbitGlobe {
                 interpolationAlgorithm: Cesium.HermitePolynomialApproximation
             });
 
-            const customSatId = index + 1;
+            const customSatId = this.parseNoradId(tle.line1) ?? index + 1;
 
             const satEntity = this.viewer.entities.add({
                 name: tle.name,
