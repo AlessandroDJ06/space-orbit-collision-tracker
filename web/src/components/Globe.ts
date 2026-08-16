@@ -12,6 +12,7 @@ export class OrbitGlobe {
     private readonly COLLISION_CHECK_INTERVAL_SEC = 5;
     private activeRisks: Map<number, string> = new Map();
     private tooltipElement!: HTMLDivElement;
+    private selectedSatId: number | null = null;
 
     constructor(containerId: string) {
         this.readyPromise = this.initializeViewer(containerId);
@@ -82,9 +83,11 @@ export class OrbitGlobe {
                 // @ts-ignore
                 const satId = entity.satId;
 
+                this.selectedSatId = satId ?? null;
+
                 const riskStatus = (satId !== undefined && this.activeRisks.has(satId))
                     ? this.activeRisks.get(satId)!
-                    : 'Not analysed yet';
+                    : 'Safe';
 
                 const riskColorCss = this.getRiskColor(satId).toCssColorString();
 
@@ -118,10 +121,12 @@ export class OrbitGlobe {
                 if (closeBtn) {
                     closeBtn.onclick = () => {
                         this.tooltipElement.style.display = 'none';
+                        this.selectedSatId = null;
                     };
                 }
             } else {
                 this.tooltipElement.style.display = 'none';
+                this.selectedSatId = null;
             }
         }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
     }
@@ -139,8 +144,6 @@ export class OrbitGlobe {
 
         const status = this.activeRisks.get(satId);
         switch (status) {
-            case 'Critical':
-                return Cesium.Color.RED;
             case 'High Risk':
                 return Cesium.Color.ORANGE;
             case 'Medium Risk':
@@ -148,7 +151,7 @@ export class OrbitGlobe {
             case 'Low Risk':
                 return Cesium.Color.LIME;
             default:
-                return Cesium.Color.CYAN;
+                return Cesium.Color.LIGHTGREY;
         }
     }
 
@@ -160,7 +163,7 @@ export class OrbitGlobe {
         let maxPeriodSeconds = 0;
 
         const isMobile = window.innerWidth < 768;
-        const pointPixelSize = isMobile ? 22 : 16;
+        const pointPixelSize = isMobile ? 16 : 12;
 
         for (let index = 0; index < tles.length; index++) {
             const tle = tles[index];
@@ -227,16 +230,15 @@ export class OrbitGlobe {
                 point: {
                     pixelSize: pointPixelSize,
                     color: new Cesium.CallbackProperty(() => this.getRiskColor(customSatId), false),
-                    outlineColor: Cesium.Color.BLACK,
-                    outlineWidth: 2
                 },
                 path: {
+                    show: new Cesium.CallbackProperty(() => this.selectedSatId === customSatId, false),
                     resolution: 60,
                     material: new Cesium.PolylineGlowMaterialProperty({
-                        glowPower: 0.15,
-                        color: Cesium.Color.GREEN
+                        glowPower: 0.5,
+                        color: Cesium.Color.RED
                     }),
-                    width: 1.5,
+                    width: 2.5,
                     leadTime: periodSeconds / 2,
                     trailTime: periodSeconds / 2
                 }
@@ -244,10 +246,6 @@ export class OrbitGlobe {
 
             // @ts-ignore
             satEntity.satId = customSatId;
-
-            if (index === 0) {
-                this.viewer.trackedEntity = satEntity;
-            }
         }
 
         this.viewer.clock.startTime = nowJulian.clone();

@@ -8,7 +8,7 @@ import type { DetectedPair } from './wasm/orbitEngine';
 import { OnnxPredictor } from './services/modelRunner.ts';
 
 const SATELLITE_GROUP = 'active';
-const MAX_SATELLITES = 500;
+const MAX_SATELLITES = 5000;
 
 const analysedPairs = new Map<number, string>();
 const predictor = new OnnxPredictor();
@@ -45,9 +45,9 @@ async function handleDetectedPairs(pairs: DetectedPair[]) {
         ]);
 
         const prediction = await predictor.runInference(input, [1, 11]);
-        const klassenNamen = ["Low Risk", "Medium Risk", "High Risk", "Critical"];
+        const klassenNamen = ["Low Risk", "Medium Risk", "High Risk"];
         const classIndex = prediction && prediction.length > 0 ? Math.round(Number(prediction[0])) : 0;
-        const statusTekst = klassenNamen[classIndex] || "Onbekend";
+        const statusTekst = klassenNamen[classIndex] || "unknown";
         analysedPairs.set(pair.sat1Id, statusTekst);
         analysedPairs.set(pair.sat2Id, statusTekst);
     }
